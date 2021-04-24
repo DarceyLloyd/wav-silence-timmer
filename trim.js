@@ -15,7 +15,8 @@
 
 // Set your target directory
 // NOTE: You need to make sure all the \ in your path are \\ (not sure if this will be an issue on linux or mac but it is on windows \\ not \)
-let userTargetDir = "W:\\www\\GIT\\wav-silence-timmer\\test_wavs";
+// let userTargetDir = "W:\\www\\GIT\\wav-silence-timmer\\test_wavs";
+let userTargetDir = "./wavs";
 
 
 // Adjustments
