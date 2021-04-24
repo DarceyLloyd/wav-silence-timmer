@@ -1,7 +1,7 @@
 # <b>WAV Silence trimmer</b>
 
-### <b>WARNING</b>
-FFMPEG is used, this has a limit of 16bit depth on WAV files, so if your samples are higher than 16bit (24bit etc) then they will be converted to 16bit depths.
+### <b>UPDATE</b>
+This utility can now handle 16, 24 and 32 bit sample bit depths...
 <br><br>
 
 
