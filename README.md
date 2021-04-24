@@ -13,6 +13,10 @@ https://nodejs.org/en/download/current/
 
 
 ### <b>Usage guide</b>
+
+Video: https://youtu.be/mDe0nOyBBh4
+
+
 - Install nodejs
 - Copy your wav files into the "wavs" folder
 - Open CMD/Terminal/CLI and go to the folder you extracted this repository to
