@@ -37,11 +37,27 @@ node trim
 
 ## <b>Linux & Mac users</b>
 
-This was built on windows so you will need download and install FFMpeg for you and edit the path to ffmpeg in trim.js
+This was built on windows so you will you will need to download and install FFMpeg & FFProbe for your OS, just set the paths to ffmpeg and ffprobe in files trim.js and libs.js.
+
+trim.js
 ```
 let ffmpegPath = __dirname + "\\ffmpeg.exe";
 ```
-Replace with something like:
+Replace with something like (no .exe of linux or mac executables):
 ```
-let ffmpegPath = "YOUR PATH TO /ffmpeg.exe";
+let ffmpegPath = "YOUR PATH TO /ffmpeg";
 ```
+
+libs.js
+```
+let ffMpegPath = "./ffmpeg.exe";
+let ffProbePath = "./ffprobe.exe";
+```
+
+Replace with something like (no .exe of linux or mac executables):
+```
+let ffMpegPath = "YOURPATH/ffmpeg";
+let ffProbePath = "YOURPATH/ffprobe";
+```
+
+or place ffmpeg and ffprobe for mac in the same location as I have the exe windows versions and remove the .exe and it should work.
