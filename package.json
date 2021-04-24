@@ -1,9 +1,10 @@
 {
-  "name": "wav-silence-timmer",
-  "version": "1.1.0",
+  "name": "wav-silence-trimmer",
+  "version": "1.2.0",
   "description": "WAV Silence trimmer using Node and FFMpeg",
   "main": "trim.js",
   "dependencies": {
+    "aftc-node-tools": "^0.6.5",
     "at-least-node": "^1.0.0",
     "graceful-fs": "^4.2.6",
     "jsonfile": "^6.1.0",
@@ -18,7 +19,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/DarceyLloyd/wav-silence-timmer.git"
+    "url": "git+https://github.com/DarceyLloyd/wav-silence-trimmer.git"
   },
   "author": "darcey.lloyd@gmail.com",
   "license": "ISC",

@@ -24,16 +24,20 @@ let endThreshold = -50; //dB
 // # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
-function log(arg) { console.log(arg); }
+const aftc = require("aftc-node-tools")
+const log = aftc.log;
 const fs = require('fs');
 const fsExtra = require('fs-extra')
 const path = require('path');
 var spawn = require('child_process').spawn;
-let { getFiles, walk, getBitDepth } = require("./libs.js");
+let { getFileParams, getFiles, walk, getBitDepth } = require("./libs.js");
 console.clear();
 
 let ffmpegPath = __dirname + "\\ffmpeg.exe";
 let count = 0;
+let noOfFilesToProcess = 0;
+let errorCount = 0;
+let filesNotProcessed = [];
 
 // Create output folder / or clean it up
 // OutputFolderParams (ofp)
@@ -55,7 +59,6 @@ if (!fs.existsSync(ofp.targetDir)) {
     fs.mkdirSync(ofp.targetDir);
 
     setTimeout(() => {
-        // console.log('success 1')
         start();
     }, 500);
 
@@ -66,7 +69,6 @@ if (!fs.existsSync(ofp.targetDir)) {
         if (err) return console.error(err)
 
         setTimeout(() => {
-            // console.log('success 2')
             start();
         }, 500);
     })
@@ -77,162 +79,163 @@ if (!fs.existsSync(ofp.targetDir)) {
 
 
 
-function start() {
-    getFiles(userTargetDir)
+async function start() {
+    await getFiles(userTargetDir)
         .then(files => {
             // log(files);
-            processFiles(files)
-        })
+            noOfFilesToProcess = files.length;
+            log("WAV Silence Trimmer".cyan);
+            log("Supports 16, 24 and 32 bit WAV files only".yellow);
+            log(("Detected: " + noOfFilesToProcess + " files, please wait...").green);
+            log(". . . . . . . . . . . . . . . . . . . . . . . . .".blue);
+
+            let c = 0;
+
+            files.forEach(async (filePath) => {
+                if (!filePath.includes(".wav")) {
+                    errorCount++;
+                    filesNotProcessed.push(filePath);
+                } else {
+                    c++;
+                    let params = getFileParams(filePath);
+                    // log(params);
+
+                    let bitDepth = await getBitDepth(params.correctedSourcePath);
+                    // log(bitDepth);
+
+                    
+
+                    await trimWav(params)
+                        .then((response) => {
+                            // log(response);
+                            // log(("Processed file: " + c + "/" + noOfFilesToProcess + " - " + params.correctedSourcePath + " [" + params.bitDepth + "Bit]").green);
+                        })
+                        .catch((response) => {
+                            // log("ERROR: " + response);
+                            errorCount++;
+                            // log(("ERROR: " + params.correctedSourcePath + " [" + params.bitDepth + "Bit]").red);
+                        })
+
+                }
+            }); // end files.forEach
+
+        }) // end getFiles.then
+
+    log((errorCount + " files failed...").red);
+    log(filesNotProcessed)
+    log("Done 2".green);
 }
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-
-let processFiles = function (arr) {
-    // Process file paths array
-    let noOfFilesToProcess = arr.length;
-    log("No of files to process: " + noOfFilesToProcess);
-
-    arr.forEach((sourcePath) => {
-        // log(sourcePath);
-        if (sourcePath.includes(".wav")) {
-
-            let params = {
-                sourcePath,
-                sourcePathBits: false,
-                sourceFileName: false,
-                sourceDir: false,
-                correctedSourcePath: false,
-                targetDir: false,
-                targetPath: false,
-                correctedTargetPath: false,
-                bitDepth: 16,
-            }
-            params.sourcePathBits = params.sourcePath.split("\\");
-            params.sourceFileName = params.sourcePathBits[(params.sourcePathBits.length - 1)];
-            params.sourceDir = params.sourcePath.replace(params.sourceFileName, "");
-            params.targetDir = params.sourceDir + "trimmed";
-            params.targetPath = params.sourceDir + "trimmed\\" + params.sourceFileName;
-            // Fix paths to allow for spaces
-            params.correctedSourcePath = params.sourcePath.replace(' ', '\ ');
-            params.correctedTargetPath = params.targetPath.replace(' ', '\ ');
-
-
-            getBitDepth(params.correctedSourcePath)
-                .then((bitDepth) => {
-                    log(params.correctedSourcePath + " [" + bitDepth + "Bit]");
-
-                    params.bitDepth = parseInt(bitDepth);
-
-                    trimWav(params);
-                    count++;
-                    if (count == noOfFilesToProcess){
-                        log("Done");
-                    }
-                })
-        }
-    });
-
-    
-
-}
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
 
 
 // Snip snip... Come here!
-let trimWav = function (params,bitDepth) {
-    // NOTE: 2 Methods
-    // Method 1:
-    // The args commented out below, no reverse and use start and stop vars (works but misses a lot)
-    // Method 2:
-    // Trim one way, reverse, trim again and reverse back
-    // ffmpeg -i "' + src + '" -af silenceremove=start_periods=1:start_silence=0.1:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_silence=0.1:start_threshold=-50dB,areverse "' + (temp + str(c)) + '.wav"'
+let trimWav = function (params) {
+    return new Promise((resolve, reject) => {
 
-    // Let's have an argument!
-    // let args = [
-    //     "-loglevel",
-    //     "error",
-    //     "-i",
-    //     params.correctedSourcePath,
-    //     "-af",
-    //     "silenceremove=start_periods=1:start_threshold=-50dB:stop_periods=1:stop_duration=1:stop_threshold=-60dB:",
-    //     // "silenceremove=start_periods=" + startPeriods + ":start_threshold=" + startThreshold + "dB:stop_periods=" + stopPeriods + ":stop_duration=" + stopDuration + ":stop_threshold=" + stopThreshold + "dB:",
-    //     "-c:a",
-    //     "pcm_s32le",
-    //     "-y",
-    //     params.correctedTargetPath
-    // ];
+        // NOTE: 2 Methods
+        // Method 1:
+        // The args commented out below, no reverse and use start and stop vars (works but misses a lot)
+        // Method 2:
+        // Trim one way, reverse, trim again and reverse back
+        // ffmpeg -i "' + src + '" -af silenceremove=start_periods=1:start_silence=0.1:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_silence=0.1:start_threshold=-50dB,areverse "' + (temp + str(c)) + '.wav"'
 
-    // ffmpeg -i "' + src + '" -af silenceremove=start_periods=1:start_silence=0.1:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_silence=0.1:start_threshold=-50dB,areverse "' + (temp + str(c)) + '.wav"'
-    let args = false;
+        // Let's have an argument!
+        // let args = [
+        //     "-loglevel",
+        //     "error",
+        //     "-i",
+        //     params.correctedSourcePath,
+        //     "-af",
+        //     "silenceremove=start_periods=1:start_threshold=-50dB:stop_periods=1:stop_duration=1:stop_threshold=-60dB:",
+        //     // "silenceremove=start_periods=" + startPeriods + ":start_threshold=" + startThreshold + "dB:stop_periods=" + stopPeriods + ":stop_duration=" + stopDuration + ":stop_threshold=" + stopThreshold + "dB:",
+        //     "-c:a",
+        //     "pcm_s32le",
+        //     "-y",
+        //     params.correctedTargetPath
+        // ];
 
-    // log(params.bitDepth)
+        // ffmpeg -i "' + src + '" -af silenceremove=start_periods=1:start_silence=0.1:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_silence=0.1:start_threshold=-50dB,areverse "' + (temp + str(c)) + '.wav"'
+        let args = false;
 
-    switch (params.bitDepth) {
-        case 24:
-            args = [
-                "-loglevel",
-                "error",
-                "-i",
-                params.correctedSourcePath,
-                "-af",
-                "silenceremove=start_periods=" + startPeriods + ":start_silence=" + startSilence + ":start_threshold=" + startThreshold + "dB,areverse,silenceremove=start_periods=" + endPeriods + ":start_silence=" + endSilence + ":start_threshold=" + endThreshold + "dB,areverse",
-                "-c:a",
-                "pcm_s24le",
-                "-ac",
-                "2",
-                params.correctedTargetPath
-            ]
-            break;
-        case 32:
-            args = [
-                "-loglevel",
-                "error",
-                "-i",
-                params.correctedSourcePath,
-                "-af",
-                "silenceremove=start_periods=" + startPeriods + ":start_silence=" + startSilence + ":start_threshold=" + startThreshold + "dB,areverse,silenceremove=start_periods=" + endPeriods + ":start_silence=" + endSilence + ":start_threshold=" + endThreshold + "dB,areverse",
-                "-c:a",
-                "pcm_s32le",
-                "-ac",
-                "2",
-                params.correctedTargetPath
-            ]
-            break;
-        default:
-            args = [
-                "-loglevel",
-                "error",
-                "-i",
-                params.correctedSourcePath,
-                "-af",
-                "silenceremove=start_periods=" + startPeriods + ":start_silence=" + startSilence + ":start_threshold=" + startThreshold + "dB,areverse,silenceremove=start_periods=" + endPeriods + ":start_silence=" + endSilence + ":start_threshold=" + endThreshold + "dB,areverse",
-                "-c:a",
-                "pcm_s16le",
-                "-ac",
-                "2",
-                params.correctedTargetPath
-            ]
-            break;
-    }
+        switch (params.bitDepth) {
+            case 24:
+                args = [
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-i",
+                    params.correctedSourcePath,
+                    "-af",
+                    "silenceremove=start_periods=" + startPeriods + ":start_silence=" + startSilence + ":start_threshold=" + startThreshold + "dB,areverse,silenceremove=start_periods=" + endPeriods + ":start_silence=" + endSilence + ":start_threshold=" + endThreshold + "dB,areverse",
+                    "-c:a",
+                    "pcm_s24le",
+                    "-ac",
+                    "2",
+                    // out
+                    params.correctedTargetPath
+                ]
+                break;
+            case 32:
+                args = [
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-i",
+                    params.correctedSourcePath,
+                    "-af",
+                    "silenceremove=start_periods=" + startPeriods + ":start_silence=" + startSilence + ":start_threshold=" + startThreshold + "dB,areverse,silenceremove=start_periods=" + endPeriods + ":start_silence=" + endSilence + ":start_threshold=" + endThreshold + "dB,areverse",
+                    "-c:a",
+                    "pcm_s32le",
+                    "-ac",
+                    "2",
+                    // out
+                    params.correctedTargetPath
+                ]
+                break;
+            case 16:
+                args = [
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-i",
+                    params.correctedSourcePath,
+                    "-af",
+                    "silenceremove=start_periods=" + startPeriods + ":start_silence=" + startSilence + ":start_threshold=" + startThreshold + "dB,areverse,silenceremove=start_periods=" + endPeriods + ":start_silence=" + endSilence + ":start_threshold=" + endThreshold + "dB,areverse",
+                    "-c:a",
+                    "pcm_s16le",
+                    "-ac",
+                    "2",
+                    // out
+                    params.correctedTargetPath
+                ]
+                break;
+            default:
+                reject();
+                break;
+        }
 
-    // log(args);
-    // log(args.join());
+        // log(args);
+        // log(args.join());
 
-    var proc = spawn(ffmpegPath, args);
+        var proc = spawn(ffmpegPath, args);
 
-    proc.stdout.on('data', function (data) {
-        console.log(data);
-    });
+        proc.stdout.on('data', function (data) {
+            // console.log(data);
+            // resolve(true);
+        });
 
-    proc.stderr.setEncoding("utf8")
-    proc.stderr.on('data', function (data) {
-        console.log(data);
-    });
+        proc.stderr.setEncoding("utf8")
+        proc.stderr.on('data', function (data) {
+            console.log(data);
+            reject();
+        });
 
-    proc.on('close', function () {
-        count++;
-        // console.log('File: ' + count + ' - finished...');
-    });
+        proc.on('close', function () {
+            resolve(true);
+        });
+
+
+
+    })
 }
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

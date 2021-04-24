@@ -148,6 +148,31 @@ let getBitDepth = function (filePath) {
 
 
 
+let getFileParams = function(sourcePath){
+    let params = {
+        sourcePath,
+        sourcePathBits: false,
+        sourceFileName: false,
+        sourceDir: false,
+        correctedSourcePath: false,
+        targetDir: false,
+        targetPath: false,
+        correctedTargetPath: false,
+        bitDepth: 16,
+    }
+    params.sourcePathBits = params.sourcePath.split("\\");
+    params.sourceFileName = params.sourcePathBits[(params.sourcePathBits.length - 1)];
+    params.sourceDir = params.sourcePath.replace(params.sourceFileName, "");
+    params.targetDir = params.sourceDir + "trimmed";
+    params.targetPath = params.sourceDir + "trimmed\\" + params.sourceFileName;
+    // Fix paths to allow for spaces
+    params.correctedSourcePath = params.sourcePath.replace(' ', '\ ');
+    params.correctedTargetPath = params.targetPath.replace(' ', '\ ');
+
+    return params;
+}
+
+
 
 
 
@@ -155,5 +180,6 @@ let getBitDepth = function (filePath) {
 module.exports = {
     getFiles,
     walk,
-    getBitDepth
+    getBitDepth,
+    getFileParams
 }
