@@ -6,13 +6,6 @@ let userTargetDir = "./wavs";
 // Adjustments
 // Still getting too much silence on your samples? Play with these settings (lower db threshold values will be tighter but can crop)
 
-let startPeriods = 1;
-let startSilence = 0.02;
-let startThreshold = -50; //dB
-let endPeriods = 1;
-let endSilence = 0.02;
-let endThreshold = -50; //dB
-
 
 
 
@@ -31,7 +24,7 @@ const fsExtra = require('fs-extra')
 const path = require('path');
 var spawn = require('child_process').spawn;
 let { getFileParams, getFiles, walk, getBitDepth } = require("./libs.js");
-console.clear();
+// console.clear();
 
 let ffmpegPath = __dirname + "\\ffmpeg.exe";
 let count = 0;
@@ -52,6 +45,18 @@ ofp.targetDir = ofp.sourceDir + "\\trimmed";
 ofp.correctedSourcePath = ofp.sourceDir.replace(' ', '\ ');
 ofp.correctedTargetPath = ofp.targetDir.replace(' ', '\ ');
 // log(ofp);
+
+
+let startPeriods = 1;
+let startSilence = 0.1;
+let startThreshold = -40; //dB
+let endPeriods = 1;
+let endSilence = 0.1;
+let endThreshold = -35; //dB
+
+
+
+
 
 
 // Make sure targetPath exists
@@ -103,7 +108,7 @@ async function start() {
                     let bitDepth = await getBitDepth(params.correctedSourcePath);
                     // log(bitDepth);
 
-                    
+
 
                     await trimWav(params)
                         .then((response) => {
@@ -123,7 +128,7 @@ async function start() {
 
     log((errorCount + " files failed...").red);
     log(filesNotProcessed)
-    log("Done 2".green);
+    log("Done".green);
 }
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -157,7 +162,26 @@ let trimWav = function (params) {
         // ffmpeg -i "' + src + '" -af silenceremove=start_periods=1:start_silence=0.1:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_silence=0.1:start_threshold=-50dB,areverse "' + (temp + str(c)) + '.wav"'
         let args = false;
 
+
+
         switch (params.bitDepth) {
+            case 16:
+                args = [
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-i",
+                    params.correctedSourcePath,
+                    "-af",
+                    "silenceremove=start_periods=" + startPeriods + ":start_silence=" + startSilence + ":start_threshold=" + startThreshold + "dB,areverse,silenceremove=start_periods=" + endPeriods + ":start_silence=" + endSilence + ":start_threshold=" + endThreshold + "dB,areverse",
+                    "-c:a",
+                    "pcm_s16le",
+                    "-ac",
+                    "2",
+                    // out
+                    params.correctedTargetPath
+                ]
+                break;
             case 24:
                 args = [
                     "-hide_banner",
@@ -213,8 +237,6 @@ let trimWav = function (params) {
                 reject();
                 break;
         }
-
-        // log(args);
         // log(args.join());
 
         var proc = spawn(ffmpegPath, args);
