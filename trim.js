@@ -1,10 +1,54 @@
-// Set your target directory
-// NOTE: You need to make sure all the \ in your path are \\ (not sure if this will be an issue on linux or mac but it is on windows \\ not \)
-// let userTargetDir = "W:\\www\\GIT\\wav-silence-timmer\\test_wavs";
-let userTargetDir = "./wavs";
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+// DONT CHANGE
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+const aftc = require("aftc-node-tools")
+const log = aftc.log;
+const fs = require('fs');
+const fsExtra = require('fs-extra')
+const path = require('path');
+const utf8 = require('utf8');
+var spawn = require('child_process').spawn;
+let { getFiles } = require("./libs.js");
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-// Adjustments
-// Still getting too much silence on your samples? Play with these settings (lower db threshold values will be tighter but can crop)
+
+
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+// SETTINGS FOR TARGET FOLDER ADJUSTMENT
+// This will change the directory that the program processes your sounds in
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+let userTargetDir = path.resolve("./wavs");
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+
+
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+// NOTE FOR WINDOWS VS MAC & LINUX USERS
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+// Want to use a specific folder on your computer? Use the next line
+// NOTE: Windows paths that use \ must be \\ or use /
+// EG:
+// let userTargetDir = path.resolve("C:\\Users\\megapixel\\Desktop\\Music Maker\\EDMProd EDM Starter Kit");
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+
+
+
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+// SETTINGS FOR YOU TO PLAY WITH FOR AUDIO TRIMMING
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+// Make your adjustments here (they can be different for different kinds of sounds)
+// EG: If you got long fade ins and/or outs and you want to preserve a lot of the very quiet sounds increase the startThreshold and endThreshold)
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+let startPeriods = 1;
+let startSilence = 0.01;
+let startThreshold = -80; //dB
+let endPeriods = 1;
+let endSilence = 0.01;
+let endThreshold = -80; //dB
+// # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+
 
 
 
@@ -16,125 +60,214 @@ let userTargetDir = "./wavs";
 // DONT CHANGE ANYTHING AFTER THIS POINT
 // # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-
-const aftc = require("aftc-node-tools")
-const log = aftc.log;
-const fs = require('fs');
-const fsExtra = require('fs-extra')
-const path = require('path');
-var spawn = require('child_process').spawn;
-let { getFileParams, getFiles, walk, getBitDepth } = require("./libs.js");
-// console.clear();
-
 let ffmpegPath = __dirname + "\\ffmpeg.exe";
-let count = 0;
-let noOfFilesToProcess = 0;
-let errorCount = 0;
-let filesNotProcessed = [];
+let ffProbe = __dirname + "\\ffprobe.exe";
 
-// Create output folder / or clean it up
-// OutputFolderParams (ofp)
-let ofp = {
-    sourceDir: userTargetDir,
-    correctedSourcePath: false,
-    targetDir: false,
-    correctedTargetPath: false,
-}
-ofp.targetDir = ofp.sourceDir + "\\trimmed";
-// Fix paths to allow for spaces
-ofp.correctedSourcePath = ofp.sourceDir.replace(' ', '\ ');
-ofp.correctedTargetPath = ofp.targetDir.replace(' ', '\ ');
-// log(ofp);
+let outputDir = path.resolve((userTargetDir + "\\trimmed"));
 
 
-let startPeriods = 1;
-let startSilence = 0.1;
-let startThreshold = -40; //dB
-let endPeriods = 1;
-let endSilence = 0.1;
-let endThreshold = -35; //dB
-
-
-
-
+aftc.cls();
+log("# # # # # # # # # # # # # # # # # # # # # # # # # # # # # #".blue);
+log(`Creating & Clearing output directory:`.yellow);
+log(`${outputDir}`.green);
 
 
 // Make sure targetPath exists
-if (!fs.existsSync(ofp.targetDir)) {
-    fs.mkdirSync(ofp.targetDir);
+if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir);
 
     setTimeout(() => {
-        start();
+        start(userTargetDir, outputDir);
     }, 500);
 
 } else {
-    // Path exists, remove all file in it!
-
-    fsExtra.emptyDir(ofp.targetDir, err => {
+    // Path exists, remove all files in it
+    fsExtra.emptyDir(outputDir, err => {
         if (err) return console.error(err)
 
         setTimeout(() => {
-            start();
+            start(userTargetDir, outputDir);
         }, 500);
     })
-
 }
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
 
 
-async function start() {
-    await getFiles(userTargetDir)
-        .then(files => {
-            // log(files);
-            noOfFilesToProcess = files.length;
-            log("WAV Silence Trimmer".cyan);
-            log("Supports 16, 24 and 32 bit WAV files only".yellow);
-            log(("Detected: " + noOfFilesToProcess + " files, please wait...").green);
-            log(". . . . . . . . . . . . . . . . . . . . . . . . .".blue);
+async function start(dir, outputDir) {
 
-            let c = 0;
-
-            files.forEach(async (filePath) => {
-                if (!filePath.includes(".wav")) {
-                    errorCount++;
-                    filesNotProcessed.push(filePath);
-                } else {
-                    c++;
-                    let params = getFileParams(filePath);
-                    // log(params);
-
-                    let bitDepth = await getBitDepth(params.correctedSourcePath);
-                    // log(bitDepth);
+    let allFiles = [];
+    let files = [];
+    let noOfFiles = 0;
+    let noOfFilesToProcess = 0;
+    let errorCount = 0;
+    let filesNotProcessed = [];
+    let fatalError = false;
 
 
+    log(`Processing samples in:`.yellow);
+    log(`${dir}`.green);
 
-                    await trimWav(params)
-                        .then((response) => {
-                            // log(response);
-                            // log(("Processed file: " + c + "/" + noOfFilesToProcess + " - " + params.correctedSourcePath + " [" + params.bitDepth + "Bit]").green);
-                        })
-                        .catch((response) => {
-                            // log("ERROR: " + response);
-                            errorCount++;
-                            // log(("ERROR: " + params.correctedSourcePath + " [" + params.bitDepth + "Bit]").red);
-                        })
+    // Get files to trim
+    allFiles = await getFiles(dir).catch(e => {
+        fatalError = true;
+        log("ERROR GETTING FILES!".red);
+        log(e);
+    })
+    if (fatalError) { reject(false); }
 
-                }
-            }); // end files.forEach
 
-        }) // end getFiles.then
+    // Process allFiles and only get wav files
+    for await (let f of allFiles) {
+        if (f.includes(".wav")) {
+            files.push(f);
+        }
+    }
 
-    log((errorCount + " files failed...").red);
-    log(filesNotProcessed)
+    // Vars
+    noOfFiles = files.length;
+    log(`${allFiles.length} files found.`.yellow);
+    log(`${noOfFiles} wav files to trim.`.yellow);
+
+    // log(files);
+
+
+    // Trim
+    let c = 0;
+    files.forEach(async (f) => {
+        c++;
+        // \r clears the line for replacement
+
+        process.stdout.clearLine();
+        process.stdout.write("Trimming " + c + " of " + noOfFiles + " [" + path.basename(f) + "]\r");
+
+        // log(f);
+        let probeData = await getBitDepth(f);
+        let bitRate = false;
+
+        // probeData = probeData.replace(/\s+/, "")
+        probeData = probeData.replace(/(?:\r\n|\r|\n)/g, '-');
+        probeData = probeData.replaceAll(" ", "");
+        // probeData = probeData.replaceAll("\n","");
+        // log(probeData);
+
+        let temp1 = probeData.indexOf(`"bits_per_sample":`);
+        let temp2 = probeData.indexOf(`,-"r_frame_rate"`);
+
+        // log(temp1);
+        // log(temp2);
+        // let temp3 = probeData.substring(temp1,0);
+        let temp3 = probeData.substr((temp1), 30);
+        temp3 = temp3.replaceAll(`,-"r_frame`, "");
+        temp3 = temp3.replaceAll(`"bits_per_sample":`, "");
+
+        // let temp3 = probeData.split(`bits_per_sample`,10);
+        // log(temp3);
+        bitRate = parseInt(temp3);
+
+
+
+        await trimWav(f, outputDir, bitRate).catch(e => {
+            error = true;
+            errorCount++;
+            filesNotProcessed.push(f);
+        })
+
+
+
+    });
+
+    // End response
+    process.stdout.clearLine();
+    if (errorCount > 0) {
+        log((errorCount + " files failed to be trimmed...").red);
+        // log(filesNotProcessed)
+        filesNotProcessed.forEach(f => {
+            log(f + " - FAILED!".red);
+        });
+    }
     log("Done".green);
+    log("# # # # # # # # # # # # # # # # # # # # # # # # # # # # # #".blue);
+
 }
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
-// Snip snip... Come here!
-let trimWav = function (params) {
+
+
+async function getBitDepth(f) {
+    return new Promise((resolve, reject) => {
+        // let args = [
+        //     "-loglevel",
+        //     "panic",
+        //     "-show_format",
+        //     "stream=bits_per_raw_sample",
+        //     "-select_streams",
+        //     "-of",
+        //     "json",
+        //     "v",
+        //     f
+        // ]
+
+        // let args2 = [
+        //     "-hide_banner",
+        //     "-loglevel",
+        //     "panic",
+        //     "-show_format",
+        //     "-show_streams",
+        //     "-of",
+        //     "json",
+        //     f
+        // ]
+
+        let args3 = [
+            "-loglevel",
+            "panic",
+            "-show_streams",
+            "-of",
+            "json",
+            f
+        ]
+
+        let proc = spawn(ffProbe, args3);
+
+        proc.stdout.setEncoding("utf8")
+        proc.stdout.on('data', function (data) {
+            // Data contains the information we need
+            // log(data);
+            // log(`${typeof(data)}`.red)
+            // log(data);
+            // data = utf8.encode(data)
+            // let j = JSON.parse(data);
+            // let bitRate = parseInt(j.streams[0].bits_per_raw_sample);
+            // resolve(bitRate);
+            resolve(data);
+        });
+
+        proc.stderr.setEncoding("utf8")
+        proc.stderr.on('data', function (data) {
+            // log(`ERROR`.red);
+            reject(false);
+        });
+
+        proc.on('close', function (data) {
+            // log(f);
+            // log(data);
+            // resolve(true);
+            // return true;
+        });
+
+    });
+
+}
+
+
+
+
+
+
+// Trim time
+async function trimWav (source, output, bitDepth) {
     return new Promise((resolve, reject) => {
 
         // NOTE: 2 Methods
@@ -163,15 +296,17 @@ let trimWav = function (params) {
         let args = false;
 
 
+        let outputFile = path.resolve((output + "/" + path.basename(source)));
 
-        switch (params.bitDepth) {
+
+        switch (bitDepth) {
             case 16:
                 args = [
                     "-hide_banner",
                     "-loglevel",
                     "error",
                     "-i",
-                    params.correctedSourcePath,
+                    source,
                     "-af",
                     "silenceremove=start_periods=" + startPeriods + ":start_silence=" + startSilence + ":start_threshold=" + startThreshold + "dB,areverse,silenceremove=start_periods=" + endPeriods + ":start_silence=" + endSilence + ":start_threshold=" + endThreshold + "dB,areverse",
                     "-c:a",
@@ -179,7 +314,7 @@ let trimWav = function (params) {
                     "-ac",
                     "2",
                     // out
-                    params.correctedTargetPath
+                    outputFile
                 ]
                 break;
             case 24:
@@ -188,7 +323,7 @@ let trimWav = function (params) {
                     "-loglevel",
                     "error",
                     "-i",
-                    params.correctedSourcePath,
+                    source,
                     "-af",
                     "silenceremove=start_periods=" + startPeriods + ":start_silence=" + startSilence + ":start_threshold=" + startThreshold + "dB,areverse,silenceremove=start_periods=" + endPeriods + ":start_silence=" + endSilence + ":start_threshold=" + endThreshold + "dB,areverse",
                     "-c:a",
@@ -196,7 +331,7 @@ let trimWav = function (params) {
                     "-ac",
                     "2",
                     // out
-                    params.correctedTargetPath
+                    outputFile
                 ]
                 break;
             case 32:
@@ -205,7 +340,7 @@ let trimWav = function (params) {
                     "-loglevel",
                     "error",
                     "-i",
-                    params.correctedSourcePath,
+                    source,
                     "-af",
                     "silenceremove=start_periods=" + startPeriods + ":start_silence=" + startSilence + ":start_threshold=" + startThreshold + "dB,areverse,silenceremove=start_periods=" + endPeriods + ":start_silence=" + endSilence + ":start_threshold=" + endThreshold + "dB,areverse",
                     "-c:a",
@@ -213,31 +348,19 @@ let trimWav = function (params) {
                     "-ac",
                     "2",
                     // out
-                    params.correctedTargetPath
+                    outputFile
                 ]
                 break;
-            case 16:
-                args = [
-                    "-hide_banner",
-                    "-loglevel",
-                    "error",
-                    "-i",
-                    params.correctedSourcePath,
-                    "-af",
-                    "silenceremove=start_periods=" + startPeriods + ":start_silence=" + startSilence + ":start_threshold=" + startThreshold + "dB,areverse,silenceremove=start_periods=" + endPeriods + ":start_silence=" + endSilence + ":start_threshold=" + endThreshold + "dB,areverse",
-                    "-c:a",
-                    "pcm_s16le",
-                    "-ac",
-                    "2",
-                    // out
-                    params.correctedTargetPath
-                ]
-                break;
+
             default:
+                log(`ERROR ON ${source} - bitDepth = ${bitDepth}`.red);
                 reject();
                 break;
         }
         // log(args.join());
+
+
+
 
         var proc = spawn(ffmpegPath, args);
 
@@ -248,8 +371,10 @@ let trimWav = function (params) {
 
         proc.stderr.setEncoding("utf8")
         proc.stderr.on('data', function (data) {
-            console.log(data);
-            reject();
+            // console.log(data);
+            log("ERROR".red);
+            console.error(data);
+            reject(false);
         });
 
         proc.on('close', function () {
