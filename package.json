@@ -1,6 +1,6 @@
 {
   "name": "wav-silence-trimmer",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "WAV Silence trimmer using Node and FFMpeg",
   "main": "trim.js",
   "dependencies": {
